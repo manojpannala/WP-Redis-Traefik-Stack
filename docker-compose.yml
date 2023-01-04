@@ -1,0 +1,52 @@
+version: "3.7"
+
+services:
+  traefik:
+    image: traefik:latest
+    restart: unless-stopped
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+    ports:
+      - 80:80
+      - 443:443
+      - 8080:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - le_data:/letsencrypt
+    networks:
+      - traefik
+  
+  nginx:
+    depends_on:
+      - wordpress
+    image: nginx:${NGINX_VERSION}
+    restart: always
+    environment:
+      - NGINX_HOST=${HOST_NAME}
+    volumes:
+      - wp_data:/var/www/html
+      - ./wordpress/plugins:/var/www/html/wp-content/plugins
+      - ./wordpress/themes:/var/www/html/wp-content/themes
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    expose:
+      - 80
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.wordpress.rule=Host(`${HOST_NAME}`)
+      - traefik.http.routers.wordpress.tls=true
+      - traefik.http.routers.wordpress.tls.certresolver=le
+    extra_hosts:
+      - ${HOST_NAME}:127.0.0.1
+    networks:
+      traefik:
+      wordpress:
