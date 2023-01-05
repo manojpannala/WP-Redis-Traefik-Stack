@@ -67,11 +67,15 @@ services:
         define( 'WP_REDIS_PORT', 6379 );
         /* Nginx Cache */
         define( 'RT_WP_NGINX_HELPER_CACHE_PATH', '/var/run/nginx-cache' );
+      PHP_MAX_INPUT_VARS: 5000
+      PHP_MAX_EXECUTION_TIME: 300
+      PHP_POST_MAX_SIZE: 70M
+      PHP_UPLOAD_MAX_FILESIZE: 70M
+
     volumes:
       - wp_data:/var/www/html
       - ./wordpress/plugins:/var/www/html/wp-content/plugins
       - ./wordpress/themes:/var/www/html/wp-content/themes
-      - ./php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
     networks:
       - wordpress  
 
@@ -107,19 +111,39 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 30
+    command: --interval 300
 
 volumes:
   db_data:
     driver: local
+    driver_opts:
+      type: none
+      device: /path/to/db_data
+      o: bind
   db_socket:
     driver: local
+    driver_opts:
+      type: none
+      device: /path/to/db_socket
+      o: bind
   wp_data:
     driver: local
+    driver_opts:
+      type: none
+      device: /path/to/wp_data
+      o: bind
   redis_data:
     driver: local
+    driver_opts:
+      type: none
+      device: /path/to/redis_data
+      o: bind
   le_data:
     driver: local
+    driver_opts:
+      type: none
+      device: /path/to/le_data
+      o: bind
 networks:
   traefik:
     driver: bridge
