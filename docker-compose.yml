@@ -2,17 +2,21 @@ version: "3.7"
 
 services:
   traefik:
+  # Reverse proxy service
     image: traefik:latest
     restart: unless-stopped
     command:
+      # Enable the API and Docker provider
       - --api.insecure=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      # Configure the entrypoints
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --entrypoints.web.http.redirections.entrypoint.permanent=true
       - --entrypoints.websecure.address=:443
+      # Configure the Let's Encrypt
       - --certificatesresolvers.le.acme.email=${EMAIL}
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.le.acme.tlschallenge=true
@@ -21,19 +25,23 @@ services:
       - 443:443
       - 8080:8080
     volumes:
+      # Mount the Docker socket and Let's Encrypt data
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - le_data:/letsencrypt
     networks:
       - traefik
   
   nginx:
+    # Wait for WordPress to be ready before starting
     depends_on:
       - wordpress
     image: nginx:${NGINX_VERSION}
     restart: always
     environment:
+      # Set the hostname for the server
       - NGINX_HOST=${HOST_NAME}
     volumes:
+      # Mount the WordPress data and configuration files
       - wp_data:/var/www/html
       - ./wordpress/plugins:/var/www/html/wp-content/plugins
       - ./wordpress/themes:/var/www/html/wp-content/themes
@@ -41,21 +49,25 @@ services:
     expose:
       - 80
     labels:
+      # Enable Traefik and configure the router
       - traefik.enable=true
       - traefik.http.routers.wordpress.rule=Host(`${HOST_NAME}`)
       - traefik.http.routers.wordpress.tls=true
       - traefik.http.routers.wordpress.tls.certresolver=le
     networks:
+      # Connect to the Traefik and WordPress networks
       traefik:
       wordpress:
   
   wordpress:
+    # Wait for the database to be healthy before starting
     depends_on:
       db:
         condition: service_healthy
     image: wordpress:${WORDPRESS_VERSION}
     restart: always
     environment:
+      # Set the database connection details
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: ${DB_NAME}
       WORDPRESS_DB_USER: ${DB_USER}
@@ -67,9 +79,13 @@ services:
         define( 'WP_REDIS_PORT', 6379 );
         /* Nginx Cache */
         define( 'RT_WP_NGINX_HELPER_CACHE_PATH', '/var/run/nginx-cache' );
+        /* Increase Memory */
+        define( 'WP_MEMORY_LIMIT', '512MB')
 
     volumes:
+      # Mount the WordPress data
       - wp_data:/var/www/html
+      # Mount the plugins and themes directories
       - ./wordpress/plugins:/var/www/html/wp-content/plugins
       - ./wordpress/themes:/var/www/html/wp-content/themes
       - ./php/php.ini:/usr/local/etc/php/php.ini
@@ -79,11 +95,14 @@ services:
   db:
     image: mariadb:latest
     volumes:
+      # Mount the data and socket directories
       - db_data:/var/lib/mysql
       - db_socket:/var/lib/mysqld
+      # Mount the configuration file
       - ./mysql_conf/my.cnf:/etc/mysql/conf.d/my.cnf
     restart: always
     environment:
+      # Set the root password and database name
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
@@ -93,17 +112,21 @@ services:
       interval: 5s
       retries: 10
     networks:
+      # Connect to the WordPress network
       - wordpress
 
   redis:
     image: redis:${REDIS_VERSION}
     restart: always
     volumes:
+      # Mount the data directory
       - redis_data:/data
     networks:
+      # Connect to the WordPress network
       - wordpress
 
   watchtower:
+    # Watchtower to autoupdate the containers
     image: containrrr/watchtower:latest
     restart: always
     volumes:
@@ -111,6 +134,7 @@ services:
     command: --interval 300
 
 volumes:
+# Define the volumes for the services
   db_data:
     driver: local
     driver_opts:
@@ -142,6 +166,7 @@ volumes:
       device: /path/to/le_data
       o: bind
 networks:
+# Define the networks for the services
   traefik:
     driver: bridge
     name: traefik
